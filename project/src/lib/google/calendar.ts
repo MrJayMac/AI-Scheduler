@@ -67,11 +67,15 @@ export async function getCalendarEvents({
   calendarId?: string
   maxResults?: number
 }): Promise<CalendarEvent[] | null> {
+  console.log('🔍 Starting getCalendarEvents...')
+  
   const accessToken = await getAccessToken()
   if (!accessToken) {
-    console.error('No valid access token available')
+    console.error('❌ No valid access token available')
     return null
   }
+  
+  console.log('✅ Access token found:', accessToken.substring(0, 20) + '...')
 
   try {
     const url = new URL(`${CALENDAR_API_BASE}/calendars/${calendarId}/events`)
@@ -81,6 +85,9 @@ export async function getCalendarEvents({
     url.searchParams.set('singleEvents', 'true')
     url.searchParams.set('orderBy', 'startTime')
 
+    console.log('🌐 API URL:', url.toString())
+    console.log('📅 Date range:', timeMin, 'to', timeMax)
+
     const response = await fetch(url.toString(), {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -88,8 +95,13 @@ export async function getCalendarEvents({
       },
     })
 
+    console.log('📡 Response status:', response.status, response.statusText)
+
     if (!response.ok) {
-      throw new Error(`Calendar API error: ${response.status} ${response.statusText}`)
+      // Get more details about the error
+      const errorText = await response.text()
+      console.error('❌ API Error Details:', errorText)
+      throw new Error(`Calendar API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     const data: CalendarListResponse = await response.json()

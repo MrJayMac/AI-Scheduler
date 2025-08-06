@@ -8,7 +8,7 @@ export function generateOAuthUrl(): string {
       response_type: 'code',
       prompt: 'consent', 
       scope: [
-        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar',
         'openid',
         'email',
         'profile',
