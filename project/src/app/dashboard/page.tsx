@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+
 
 export default function DashboardPage() {
   const supabase = createClient()
@@ -26,7 +27,7 @@ export default function DashboardPage() {
   }, [supabase, router])
 
   return (
-    <div>
+    <div style={{ padding: '20px' }}>
       <h1>Welcome {userEmail}</h1>
     </div>
   )
