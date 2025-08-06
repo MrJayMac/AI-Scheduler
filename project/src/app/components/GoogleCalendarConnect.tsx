@@ -16,17 +16,39 @@ export default function GoogleCalendarConnect() {
 
   const checkConnection = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      // Wait for auth to be ready
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError) {
+        console.error('Auth error:', authError)
+        setIsConnected(false)
+        setLoading(false)
+        return
+      }
+      
+      if (!user) {
+        console.log('No user found')
+        setIsConnected(false)
+        setLoading(false)
+        return
+      }
 
-      const { data: tokens } = await supabase
+      console.log('User authenticated:', user.id)
+
+      const { data: tokens, error: dbError } = await supabase
         .from('oauth_tokens')
         .select('*')
         .eq('user_id', user.id)
         .eq('provider', 'google')
         .single()
 
-      setIsConnected(!!tokens?.access_token)
+      if (dbError && dbError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+        console.error('Database error:', dbError)
+        setIsConnected(false)
+      } else {
+        setIsConnected(!!tokens?.access_token)
+        console.log('Connection check result:', !!tokens?.access_token)
+      }
     } catch (error) {
       console.error('Error checking calendar connection:', error)
       setIsConnected(false)
