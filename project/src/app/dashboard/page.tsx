@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import GoogleCalendarConnect from '@/app/components/GoogleCalendarConnect'
 
 
 export default function DashboardPage() {
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   return (
     <div style={{ padding: '20px' }}>
       <h1>Welcome {userEmail}</h1>
+      <GoogleCalendarConnect />
     </div>
   )
 }
