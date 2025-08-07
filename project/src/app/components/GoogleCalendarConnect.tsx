@@ -42,7 +42,7 @@ export default function GoogleCalendarConnect() {
         .eq('provider', 'google')
         .single()
 
-      if (dbError && dbError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      if (dbError && dbError.code !== 'PGRST116') {
         console.error('Database error:', dbError)
         setIsConnected(false)
       } else {
