@@ -1,5 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
-import { getCalendarEvents } from '@/lib/google/calendar'
+import { createClient } from '@/lib/supabase/server'
 
 export interface Task {
   id: string
@@ -54,10 +53,9 @@ const WORKING_HOURS = {
   end: 17
 }
 
-export async function generateSchedule(userId: string): Promise<ScheduleResult> {
+export async function generateSchedule(userId: string, calendarEvents: CalendarEvent[]): Promise<ScheduleResult> {
   try {
     const tasks = await getPendingTasks(userId)
-    const calendarEvents = await getWeekCalendarEvents()
     
     if (!tasks.length) {
       return {
@@ -91,7 +89,7 @@ export async function generateSchedule(userId: string): Promise<ScheduleResult> 
 }
 
 async function getPendingTasks(userId: string): Promise<Task[]> {
-  const supabase = createClient()
+  const supabase = await createClient()
   
   const { data: tasks, error } = await supabase
     .from('tasks')
@@ -107,23 +105,7 @@ async function getPendingTasks(userId: string): Promise<Task[]> {
   return tasks || []
 }
 
-async function getWeekCalendarEvents(): Promise<CalendarEvent[]> {
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay())
-  startOfWeek.setHours(0, 0, 0, 0)
-  
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6)
-  endOfWeek.setHours(23, 59, 59, 999)
 
-  const events = await getCalendarEvents({
-    timeMin: startOfWeek.toISOString(),
-    timeMax: endOfWeek.toISOString()
-  })
-
-  return events || []
-}
 
 function sortTasksByPriority(tasks: Task[]): Task[] {
   return tasks.sort((a, b) => {
@@ -273,39 +255,42 @@ function scheduleTasksInWindows(tasks: Task[], windows: TimeWindow[]): Scheduled
 
 export async function saveScheduledTasks(userId: string, scheduledTasks: ScheduledTask[]): Promise<boolean> {
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
     
     await supabase
       .from('time_blocks')
       .delete()
       .eq('user_id', userId)
     
-    const timeBlocks = scheduledTasks
-      .filter(st => st.scheduled)
-      .map(st => ({
-        user_id: userId,
-        task_id: st.task.id,
-        title: st.task.title,
-        start_time: st.startTime.toISOString(),
-        end_time: st.endTime.toISOString(),
-        duration_min: st.task.duration_min,
-        priority: st.task.priority,
-        status: 'scheduled',
-        created_at: new Date().toISOString()
-      }))
+    const scheduledTasksFiltered = scheduledTasks.filter(st => st.scheduled)
     
-    if (timeBlocks.length > 0) {
-      const { error } = await supabase
-        .from('time_blocks')
-        .insert(timeBlocks)
-      
-      if (error) {
-        throw error
-      }
+    if (scheduledTasksFiltered.length === 0) {
+      return true
+    }
+    
+    const timeBlocks = scheduledTasksFiltered.map(st => ({
+      user_id: userId,
+      task_id: st.task.id,
+      title: st.task.title,
+      start_time: st.startTime.toISOString(),
+      end_time: st.endTime.toISOString(),
+      duration_min: st.task.duration_min,
+      priority: st.task.priority,
+      status: 'scheduled',
+      created_at: new Date().toISOString()
+    }))
+    
+    const { error } = await supabase
+      .from('time_blocks')
+      .insert(timeBlocks)
+    
+    if (error) {
+      throw error
     }
     
     return true
   } catch (error) {
+    console.error('Error saving scheduled tasks:', error)
     return false
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateSchedule, saveScheduledTasks, ScheduleResult } from '@/lib/scheduler/scheduler'
+import { createCalendarEvent, getCalendarEvents } from '@/lib/google/calendar-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,7 +16,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const scheduleResult = await generateSchedule(user.id)
+    // Get this week's calendar events
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setDate(now.getDate() - now.getDay())
+    startOfWeek.setHours(0, 0, 0, 0)
+    
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+    endOfWeek.setHours(23, 59, 59, 999)
+
+    const calendarEvents = await getCalendarEvents({
+      timeMin: startOfWeek.toISOString(),
+      timeMax: endOfWeek.toISOString()
+    }) || []
+
+    const scheduleResult = await generateSchedule(user.id, calendarEvents)
     
     if (!scheduleResult.success) {
       return NextResponse.json(
@@ -32,6 +48,37 @@ export async function POST(request: NextRequest) {
           { error: 'Failed to save scheduled tasks' },
           { status: 500 }
         )
+      }
+
+      // Create Google Calendar events and update time_blocks with google_event_id
+      for (const st of scheduleResult.scheduledTasks) {
+        try {
+          const googleEvent = await createCalendarEvent({
+            summary: st.task.title,
+            description: `AI Scheduled Task - Priority: ${st.task.priority}\nDuration: ${st.task.duration_min} minutes`,
+            start: {
+              dateTime: st.startTime.toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            },
+            end: {
+              dateTime: st.endTime.toISOString(),
+              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            }
+          })
+          
+          if (googleEvent) {
+            // Update the time_block with the google_event_id
+            await supabase
+              .from('time_blocks')
+              .update({ google_event_id: googleEvent.id })
+              .eq('user_id', user.id)
+              .eq('task_id', st.task.id)
+              .eq('start_time', st.startTime.toISOString())
+          }
+        } catch (error) {
+          console.error('Failed to create Google Calendar event:', error)
+          // Continue with other events even if one fails
+        }
       }
     }
 
