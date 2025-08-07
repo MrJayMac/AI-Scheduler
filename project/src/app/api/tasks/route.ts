@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (dbError) {
-      console.error('Database error:', dbError)
       return NextResponse.json(
         { error: 'Failed to save task to database' },
         { status: 500 }
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('API error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

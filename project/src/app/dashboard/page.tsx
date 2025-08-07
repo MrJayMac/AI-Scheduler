@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import GoogleCalendarConnect from '../components/GoogleCalendarConnect'
 import CalendarEvents from '../components/CalendarEvents'
 import TaskInput from '../components/TaskInput'
+import ScheduleView from '../components/ScheduleView'
 
 
 export default function DashboardPage() {
@@ -33,10 +34,9 @@ export default function DashboardPage() {
     <div style={{ padding: '20px' }}>
       <h1>Welcome {userEmail}</h1>
       <GoogleCalendarConnect />
-      
-      <TaskInput />
-      
       <CalendarEvents />
+      <TaskInput />
+      <ScheduleView />
     </div>
   )
 }

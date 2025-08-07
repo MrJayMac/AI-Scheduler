@@ -50,7 +50,7 @@ export default function TaskInput() {
       setTaskInput('')
       
     } catch (error) {
-      console.error('Error creating task:', error)
+
       setError(error instanceof Error ? error.message : 'Failed to create task')
     } finally {
       setLoading(false)
@@ -115,7 +115,7 @@ export default function TaskInput() {
           border: '1px solid #f5c6cb',
           borderRadius: '4px'
         }}>
-          ❌ {error}
+          {error}
         </div>
       )}
 
@@ -128,7 +128,7 @@ export default function TaskInput() {
           border: '1px solid #c3e6cb',
           borderRadius: '4px'
         }}>
-          ✅ {success}
+          {success}
         </div>
       )}
 

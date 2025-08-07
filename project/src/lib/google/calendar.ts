@@ -26,7 +26,7 @@ export interface CalendarListResponse {
   nextSyncToken?: string
 }
 
-// Get valid access token for API calls
+
 async function getAccessToken(): Promise<string | null> {
   const supabase = createClient()
   
@@ -77,14 +77,14 @@ async function refreshAccessToken(refreshToken: string, userId: string): Promise
     })
 
     if (!response.ok) {
-      console.error('❌ Failed to refresh token:', response.status, response.statusText)
+      console.error('Failed to refresh token:', response.status, response.statusText)
       return null
     }
 
     const data = await response.json()
     
     if (!data.access_token) {
-      console.error('❌ No access token in refresh response')
+      console.error('No access token in refresh response')
       return null
     }
 
@@ -102,41 +102,36 @@ async function refreshAccessToken(refreshToken: string, userId: string): Promise
       .eq('provider', 'google')
 
     if (updateError) {
-      console.error('❌ Failed to update refreshed token:', updateError)
+      console.error('Failed to update refreshed token:', updateError)
       return null
     }
 
-    console.log('✅ Token refreshed successfully')
+    console.log('Token refreshed successfully')
     return data.access_token
 
   } catch (error) {
-    console.error('❌ Error refreshing token:', error)
+    console.error('Error refreshing token:', error)
     return null
   }
 }
 
-// Fetch calendar events for a date range
+
 export async function getCalendarEvents({
   timeMin,
   timeMax,
   calendarId = 'primary',
   maxResults = 250
 }: {
-  timeMin: string // ISO string
-  timeMax: string // ISO string
+  timeMin: string
+  timeMax: string
   calendarId?: string
   maxResults?: number
 }): Promise<CalendarEvent[] | null> {
-  console.log('🔍 Starting getCalendarEvents...')
-  
   const accessToken = await getAccessToken()
   if (!accessToken) {
-    console.error('No valid access token available')
     return null
   }
   
-  console.log('Access token found:', accessToken.substring(0, 20) + '...')
-
   try {
     const url = new URL(`${CALENDAR_API_BASE}/calendars/${calendarId}/events`)
     url.searchParams.set('timeMin', timeMin)
@@ -145,9 +140,6 @@ export async function getCalendarEvents({
     url.searchParams.set('singleEvents', 'true')
     url.searchParams.set('orderBy', 'startTime')
 
-    console.log('🌐 API URL:', url.toString())
-    console.log('📅 Date range:', timeMin, 'to', timeMax)
-
     const response = await fetch(url.toString(), {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -155,28 +147,21 @@ export async function getCalendarEvents({
       },
     })
 
-    console.log('📡 Response status:', response.status, response.statusText)
-
     if (!response.ok) {
-      // Get more details about the error
-      const errorText = await response.text()
-      console.error('API Error Details:', errorText)
-      throw new Error(`Calendar API error: ${response.status} ${response.statusText} - ${errorText}`)
+      throw new Error(`Calendar API error: ${response.status} ${response.statusText}`)
     }
 
     const data: CalendarListResponse = await response.json()
     return data.items || []
   } catch (error) {
-    console.error('Error fetching calendar events:', error)
     return null
   }
 }
 
-// Get events for current week
 export async function getThisWeekEvents(): Promise<CalendarEvent[] | null> {
   const now = new Date()
   const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay()) // Sunday
+  startOfWeek.setDate(now.getDate() - now.getDay()) 
   startOfWeek.setHours(0, 0, 0, 0)
 
   const endOfWeek = new Date(startOfWeek)
@@ -189,7 +174,6 @@ export async function getThisWeekEvents(): Promise<CalendarEvent[] | null> {
   })
 }
 
-// Get events for a specific date
 export async function getDayEvents(date: Date): Promise<CalendarEvent[] | null> {
   const startOfDay = new Date(date)
   startOfDay.setHours(0, 0, 0, 0)
@@ -203,7 +187,6 @@ export async function getDayEvents(date: Date): Promise<CalendarEvent[] | null> 
   })
 }
 
-// Create a new calendar event
 export async function createCalendarEvent({
   summary,
   description,
@@ -219,7 +202,6 @@ export async function createCalendarEvent({
 }): Promise<CalendarEvent | null> {
   const accessToken = await getAccessToken()
   if (!accessToken) {
-    console.error('No valid access token available')
     return null
   }
 
@@ -244,18 +226,16 @@ export async function createCalendarEvent({
 
     return await response.json()
   } catch (error) {
-    console.error('Error creating calendar event:', error)
     return null
   }
 }
 
-// Check if calendar is connected and accessible
 export async function testCalendarConnection(): Promise<boolean> {
   const accessToken = await getAccessToken()
   if (!accessToken) return false
 
   try {
-    const response = await fetch(`${CALENDAR_API_BASE}/calendars/primary`, {
+    const response = await fetch(`${CALENDAR_API_BASE}/calendar/v3/calendars/primary`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
@@ -263,7 +243,6 @@ export async function testCalendarConnection(): Promise<boolean> {
 
     return response.ok
   } catch (error) {
-    console.error('Calendar connection test failed:', error)
     return false
   }
 }
