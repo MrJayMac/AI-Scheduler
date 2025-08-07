@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-export default function TaskInput() {
+interface TaskInputProps {
+  onTaskAdded?: () => void
+}
+
+export default function TaskInput({ onTaskAdded }: TaskInputProps) {
   const supabase = createClient()
   const [taskInput, setTaskInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -46,9 +50,14 @@ export default function TaskInput() {
         throw new Error(result.error || 'Failed to create task')
       }
 
-      setSuccess(`Task created: "${result.task.title}"`)
-      setTaskInput('')
-      
+      if (result.success) {
+        setTaskInput('')
+        setSuccess(`Task created successfully! Title: "${result.task.title}"`)
+        onTaskAdded?.()
+      } else {
+        setError(result.error || 'Failed to create task')
+      }
+
     } catch (error) {
 
       setError(error instanceof Error ? error.message : 'Failed to create task')

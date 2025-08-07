@@ -5,12 +5,14 @@ import { createClient } from '@/lib/supabase/client'
 
 interface TimeBlock {
   id: string
-  title: string
+  task_id: string
+  task_title: string
   start_time: string
   end_time: string
   duration_min: number
   priority: 'low' | 'medium' | 'high'
   status: string
+  google_event_id?: string
 }
 
 interface ScheduleResult {
@@ -34,16 +36,21 @@ interface ScheduleResult {
   }>
 }
 
-export default function ScheduleView() {
+interface ScheduleViewProps {
+  refreshTrigger?: number
+}
+
+export default function ScheduleView({ refreshTrigger }: ScheduleViewProps) {
   const supabase = createClient()
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [lastResult, setLastResult] = useState<ScheduleResult | null>(null)
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchSchedule()
-  }, [])
+  }, [refreshTrigger || 0])
 
   const fetchSchedule = async () => {
     setLoading(true)
@@ -103,6 +110,30 @@ export default function ScheduleView() {
     } catch (error) {
       console.error('Error clearing schedule:', error)
       alert('Failed to clear schedule')
+    }
+  }
+
+  const deleteTask = async (taskId: string) => {
+    try {
+      setDeletingTaskId(taskId)
+      
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'DELETE'
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Refresh the schedule to show updated state
+        fetchSchedule()
+      } else {
+        alert('Failed to delete task: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error deleting task:', error)
+      alert('Failed to delete task')
+    } finally {
+      setDeletingTaskId(null)
     }
   }
 
@@ -244,13 +275,28 @@ export default function ScheduleView() {
                     >
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
-                          {block.title}
+                          {block.task_title}
                         </div>
                         <div style={{ color: '#6c757d', fontSize: '14px' }}>
                           {formatTime(block.start_time)} - {formatTime(block.end_time)} 
                           ({block.duration_min} min)
                         </div>
                       </div>
+                      <button
+                        onClick={() => deleteTask(block.task_id)}
+                        disabled={deletingTaskId === block.task_id}
+                        style={{
+                          padding: '6px 10px',
+                          backgroundColor: deletingTaskId === block.task_id ? '#ccc' : '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: deletingTaskId === block.task_id ? 'not-allowed' : 'pointer',
+                          fontSize: '12px'
+                        }}
+                      >
+                        {deletingTaskId === block.task_id ? '...' : 'Delete'}
+                      </button>
                       <div style={{ 
                         padding: '4px 8px', 
                         backgroundColor: getPriorityColor(block.priority),

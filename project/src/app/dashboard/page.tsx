@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import GoogleCalendarConnect from '../components/GoogleCalendarConnect'
 import CalendarEvents from '../components/CalendarEvents'
 import TaskInput from '../components/TaskInput'
+import TaskList from '../components/TaskList'
 import ScheduleView from '../components/ScheduleView'
 
 
@@ -13,6 +14,8 @@ export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0)
+  const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = useState(0)
 
   useEffect(() => {
     const getUser = async () => {
@@ -30,13 +33,25 @@ export default function DashboardPage() {
     getUser()
   }, [supabase, router])
 
+  const handleTaskAdded = () => {
+    setTaskRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleTaskDeleted = () => {
+    setTaskRefreshTrigger(prev => prev + 1)
+    setScheduleRefreshTrigger(prev => prev + 1)
+  }
+
   return (
     <div style={{ padding: '20px' }}>
       <h1>Welcome {userEmail}</h1>
       <GoogleCalendarConnect />
       <CalendarEvents />
-      <TaskInput />
-      <ScheduleView />
+      <TaskInput onTaskAdded={handleTaskAdded} />
+      <TaskList 
+        refreshTrigger={taskRefreshTrigger} 
+      />
+      <ScheduleView refreshTrigger={scheduleRefreshTrigger} />
     </div>
   )
 }

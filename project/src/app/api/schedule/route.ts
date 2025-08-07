@@ -51,35 +51,49 @@ export async function POST(request: NextRequest) {
       }
 
       // Create Google Calendar events and update time_blocks with google_event_id
+      const scheduledTaskIds: string[] = []
       for (const st of scheduleResult.scheduledTasks) {
         try {
           const googleEvent = await createCalendarEvent({
             summary: st.task.title,
-            description: `AI Scheduled Task - Priority: ${st.task.priority}\nDuration: ${st.task.duration_min} minutes`,
+            description: `Priority: ${st.task.priority}\nDuration: ${st.task.duration_min} minutes`,
             start: {
               dateTime: st.startTime.toISOString(),
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              timeZone: 'America/New_York'
             },
             end: {
               dateTime: st.endTime.toISOString(),
-              timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+              timeZone: 'America/New_York'
             }
           })
-          
+
           if (googleEvent) {
-            // Update the time_block with the google_event_id
+            // Update the time_block with the Google event ID
             await supabase
               .from('time_blocks')
               .update({ google_event_id: googleEvent.id })
               .eq('user_id', user.id)
               .eq('task_id', st.task.id)
               .eq('start_time', st.startTime.toISOString())
+            
+            // Track successfully scheduled tasks
+            scheduledTaskIds.push(st.task.id)
           }
         } catch (error) {
           console.error('Failed to create Google Calendar event:', error)
           // Continue with other events even if one fails
         }
       }
+
+      // Mark successfully scheduled tasks as 'scheduled' status
+      if (scheduledTaskIds.length > 0) {
+        await supabase
+          .from('tasks')
+          .update({ status: 'scheduled' })
+          .eq('user_id', user.id)
+          .in('id', scheduledTaskIds)
+      }
+
     }
 
     return NextResponse.json({

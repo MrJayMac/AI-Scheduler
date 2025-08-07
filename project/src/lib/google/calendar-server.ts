@@ -150,6 +150,33 @@ export async function getCalendarEvents({
   }
 }
 
+export async function deleteCalendarEvent({
+  eventId,
+  calendarId = 'primary'
+}: {
+  eventId: string
+  calendarId?: string
+}): Promise<boolean> {
+  const accessToken = await getAccessToken()
+  if (!accessToken) {
+    return false
+  }
+
+  try {
+    const response = await fetch(`${CALENDAR_API_BASE}/calendars/${calendarId}/events/${eventId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    })
+
+    return response.ok
+  } catch (error) {
+    console.error('Error deleting calendar event:', error)
+    return false
+  }
+}
+
 export async function createCalendarEvent({
   summary,
   description,
