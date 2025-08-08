@@ -65,6 +65,7 @@ export default function DashboardPage() {
         refreshTrigger={scheduleRefreshTrigger} 
         onScheduleGenerated={handleScheduleGenerated}
         taskAddedTrigger={taskAddedTrigger}
+        onTaskDeleted={handleTaskDeleted}
       />
       <CalendarView refreshTrigger={calendarRefreshTrigger} />
     </div>

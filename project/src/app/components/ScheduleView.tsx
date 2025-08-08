@@ -40,9 +40,10 @@ interface ScheduleViewProps {
   refreshTrigger?: number
   onScheduleGenerated?: () => void
   taskAddedTrigger?: number
+  onTaskDeleted?: () => void
 }
 
-export default function ScheduleView({ refreshTrigger, onScheduleGenerated, taskAddedTrigger }: ScheduleViewProps) {
+export default function ScheduleView({ refreshTrigger, onScheduleGenerated, taskAddedTrigger, onTaskDeleted }: ScheduleViewProps) {
   const supabase = createClient()
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(false)
@@ -119,6 +120,8 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
       if (data.success) {
         setTimeBlocks([])
         setLastResult(null)
+        // Notify parent component to refresh all related components (tasks back to pending)
+        onTaskDeleted?.()
       } else {
         alert('Failed to clear schedule: ' + data.error)
       }
@@ -141,6 +144,8 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
       if (data.success) {
         // Refresh the schedule to show updated state
         fetchSchedule()
+        // Notify parent component to refresh all related components
+        onTaskDeleted?.()
       } else {
         alert('Failed to delete task: ' + data.error)
       }

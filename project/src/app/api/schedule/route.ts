@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { generateSchedule, saveScheduledTasks, ScheduleResult } from '@/lib/scheduler/scheduler'
-import { createCalendarEvent, getCalendarEvents } from '@/lib/google/calendar-server'
+import { generateSchedule, saveScheduledTasks } from '@/lib/scheduler/scheduler'
+import { getCalendarEvents, createCalendarEvent, deleteCalendarEvent } from '@/lib/google/calendar-server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -178,6 +178,42 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Get all scheduled time_blocks to find their Google Calendar event IDs
+    const { data: timeBlocks, error: fetchError } = await supabase
+      .from('time_blocks')
+      .select('google_event_id, task_id')
+      .eq('user_id', user.id)
+      .eq('status', 'scheduled')
+
+    if (fetchError) {
+      console.error('Error fetching time blocks for deletion:', fetchError)
+    }
+
+    // Delete Google Calendar events if they exist
+    if (timeBlocks && timeBlocks.length > 0) {
+      for (const block of timeBlocks) {
+        if (block.google_event_id) {
+          try {
+            await deleteCalendarEvent(block.google_event_id)
+          } catch (error) {
+            console.error('Failed to delete Google Calendar event:', error)
+            // Continue with other deletions even if one fails
+          }
+        }
+      }
+
+      // Reset task status back to 'pending' for all scheduled tasks
+      const taskIds = timeBlocks.map(block => block.task_id).filter(Boolean)
+      if (taskIds.length > 0) {
+        await supabase
+          .from('tasks')
+          .update({ status: 'pending' })
+          .eq('user_id', user.id)
+          .in('id', taskIds)
+      }
+    }
+
+    // Delete all time_blocks for this user
     const { error: deleteError } = await supabase
       .from('time_blocks')
       .delete()
