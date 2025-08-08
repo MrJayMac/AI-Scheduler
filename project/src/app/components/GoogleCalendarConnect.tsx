@@ -16,7 +16,6 @@ export default function GoogleCalendarConnect() {
 
   const checkConnection = async () => {
     try {
-      // Wait for auth to be ready
       const { data: { user }, error: authError } = await supabase.auth.getUser()
       
       if (authError) {

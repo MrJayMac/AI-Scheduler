@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const error = searchParams.get('error')
 
-  // Handle OAuth errors
   if (error) {
     console.error('OAuth error:', error)
     return NextResponse.redirect(new URL('/dashboard?error=oauth_failed', request.url))
@@ -17,7 +16,6 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Exchange authorization code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {

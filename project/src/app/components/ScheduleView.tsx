@@ -38,9 +38,10 @@ interface ScheduleResult {
 
 interface ScheduleViewProps {
   refreshTrigger?: number
+  onScheduleGenerated?: () => void
 }
 
-export default function ScheduleView({ refreshTrigger }: ScheduleViewProps) {
+export default function ScheduleView({ refreshTrigger, onScheduleGenerated }: ScheduleViewProps) {
   const supabase = createClient()
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(false)
@@ -78,9 +79,11 @@ export default function ScheduleView({ refreshTrigger }: ScheduleViewProps) {
       
       if (data.success) {
         setLastResult(data)
-        await fetchSchedule()
+        fetchSchedule()
+        alert(`Schedule generated! ${data.scheduledCount} tasks scheduled, ${data.unscheduledCount} couldn't be scheduled.`)
+        onScheduleGenerated?.()
       } else {
-        alert('Failed to generate schedule: ' + data.error)
+        alert('Failed to generate schedule: ' + (data.error || 'Unknown error'))
       }
     } catch (error) {
       console.error('Error generating schedule:', error)

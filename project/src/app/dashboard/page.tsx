@@ -8,6 +8,7 @@ import CalendarEvents from '../components/CalendarEvents'
 import TaskInput from '../components/TaskInput'
 import TaskList from '../components/TaskList'
 import ScheduleView from '../components/ScheduleView'
+import CalendarView from '../components/CalendarView'
 
 
 export default function DashboardPage() {
@@ -16,6 +17,7 @@ export default function DashboardPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0)
   const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = useState(0)
+  const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState(0)
 
   useEffect(() => {
     const getUser = async () => {
@@ -40,6 +42,12 @@ export default function DashboardPage() {
   const handleTaskDeleted = () => {
     setTaskRefreshTrigger(prev => prev + 1)
     setScheduleRefreshTrigger(prev => prev + 1)
+    setCalendarRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleScheduleGenerated = () => {
+    setScheduleRefreshTrigger(prev => prev + 1)
+    setCalendarRefreshTrigger(prev => prev + 1)
   }
 
   return (
@@ -51,7 +59,8 @@ export default function DashboardPage() {
       <TaskList 
         refreshTrigger={taskRefreshTrigger} 
       />
-      <ScheduleView refreshTrigger={scheduleRefreshTrigger} />
+      <ScheduleView refreshTrigger={scheduleRefreshTrigger} onScheduleGenerated={handleScheduleGenerated} />
+      <CalendarView refreshTrigger={calendarRefreshTrigger} />
     </div>
   )
 }
