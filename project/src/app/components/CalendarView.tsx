@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, momentLocalizer, View, Views } from 'react-big-calendar'
+import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 import { createClient } from '@/lib/supabase/client'
-import { getCalendarEvents } from '@/lib/google/calendar'
+
 
 const localizer = momentLocalizer(moment)
+const DragAndDropCalendar = withDragAndDrop<CalendarEvent>(Calendar)
 
 interface CalendarEvent {
   id: string
@@ -19,19 +22,20 @@ interface CalendarEvent {
     priority?: string
     googleEventId?: string
     taskId?: string
+    locked?: boolean
   }
 }
 
 interface TimeBlock {
   id: string
   task_id: string
-  task_title: string
+  title: string
   start_time: string
   end_time: string
   duration_min: number
-  priority: 'low' | 'medium' | 'high'
+  priority: string
   status: string
-  google_event_id?: string
+  locked?: boolean
 }
 
 interface GoogleCalendarEvent {
@@ -92,11 +96,15 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
 
   const fetchGoogleEvents = async (startDate: Date, endDate: Date): Promise<GoogleCalendarEvent[]> => {
     try {
-      const events = await getCalendarEvents({
-        timeMin: startDate.toISOString(),
-        timeMax: endDate.toISOString()
-      })
-      return events || []
+      const response = await fetch(`/api/calendar/events?timeMin=${startDate.toISOString()}&timeMax=${endDate.toISOString()}`)
+      const data = await response.json()
+      
+      if (data.success) {
+        return data.events || []
+      } else {
+        console.error('Error fetching Google events:', data.error)
+        return []
+      }
     } catch (error) {
       console.error('Error fetching Google events:', error)
       return []
@@ -145,26 +153,26 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
 
   const formatTimeBlocks = (timeBlocks: TimeBlock[]): CalendarEvent[] => {
     return timeBlocks.map(block => ({
-      id: `ai-task-${block.id}`,
-      title: `AI: ${block.task_title}`,
+      id: `ai-${block.id}`,
+      title: `${block.locked ? '🔒 ' : ''}AI: ${block.title}`,
       start: new Date(block.start_time),
       end: new Date(block.end_time),
       resource: {
         type: 'ai-task' as const,
         priority: block.priority,
-        taskId: block.task_id
+        taskId: block.id,
+        locked: block.locked || false
       }
     }))
   }
 
   const eventStyleGetter = (event: CalendarEvent) => {
-    let backgroundColor = '#3174ad' // Default blue
+    let backgroundColor = '#007bff' // Default blue for Google events
     let color = 'white'
+    let border = 'none'
     
-    if (event.resource.type === 'google') {
-      backgroundColor = '#4285f4' // Google blue
-    } else if (event.resource.type === 'ai-task') {
-      // Color code by priority
+    if (event.resource.type === 'ai-task') {
+      // Color code by priority for AI tasks
       switch (event.resource.priority) {
         case 'high':
           backgroundColor = '#dc3545' // Red
@@ -179,15 +187,22 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
         default:
           backgroundColor = '#6c757d' // Gray
       }
+      
+      // Add special styling for locked blocks
+      if (event.resource.locked) {
+        border = '3px solid #000'
+        backgroundColor = backgroundColor + 'CC' // Add transparency
+      }
     }
     
     return {
       style: {
         backgroundColor,
         color,
-        border: 'none',
+        border,
         borderRadius: '4px',
-        fontSize: '12px'
+        fontSize: '12px',
+        fontWeight: event.resource.locked ? 'bold' : 'normal'
       }
     }
   }
@@ -207,6 +222,83 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
       alert(`AI Scheduled Task: ${event.title.replace('AI: ', '')}\nPriority: ${event.resource.priority}\nDuration: ${moment(event.end).diff(moment(event.start), 'minutes')} minutes`)
     } else {
       alert(`Google Calendar Event: ${event.title}`)
+    }
+  }
+
+  const isDraggable = (event: CalendarEvent) => {
+    // Only AI scheduled tasks can be dragged/resized
+    return event.resource.type === 'ai-task'
+  }
+
+  const handleEventDrop = async (args: any) => {
+    const { event, start, end } = args
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    
+    if (event.resource.type !== 'ai-task' || !event.resource.taskId) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/time-blocks/${event.resource.taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          duration_min: moment(endDate).diff(moment(startDate), 'minutes')
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Refresh events to show updated state
+        fetchAllEvents()
+      } else {
+        alert('Failed to update time block: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error updating time block:', error)
+      alert('Failed to update time block')
+    }
+  }
+
+  const handleEventResize = async (args: any) => {
+    const { event, start, end } = args
+    const startDate = new Date(start)
+    const endDate = new Date(end)
+    
+    if (event.resource.type !== 'ai-task' || !event.resource.taskId) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/time-blocks/${event.resource.taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          duration_min: moment(endDate).diff(moment(startDate), 'minutes')
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        // Refresh events to show updated state
+        fetchAllEvents()
+      } else {
+        alert('Failed to resize time block: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error resizing time block:', error)
+      alert('Failed to resize time block')
     }
   }
 
@@ -290,7 +382,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
       </div>
 
       <div style={{ height: '600px' }}>
-        <Calendar
+        <DragAndDropCalendar
           localizer={localizer}
           events={events}
           startAccessor="start"
@@ -302,6 +394,10 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
           onNavigate={handleNavigate}
           eventPropGetter={eventStyleGetter}
           onSelectEvent={handleSelectEvent}
+          onEventDrop={handleEventDrop}
+          onEventResize={handleEventResize}
+          resizable
+          draggableAccessor={isDraggable}
           popup
           showMultiDayTimes
           step={30}

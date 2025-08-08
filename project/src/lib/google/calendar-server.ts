@@ -219,3 +219,39 @@ export async function createCalendarEvent({
     return null
   }
 }
+
+export async function updateCalendarEvent(
+  eventId: string,
+  eventData: {
+    summary: string
+    description?: string
+    start: { dateTime: string; timeZone?: string }
+    end: { dateTime: string; timeZone?: string }
+  },
+  calendarId: string = 'primary'
+): Promise<CalendarEvent | null> {
+  const accessToken = await getAccessToken()
+  if (!accessToken) {
+    return null
+  }
+
+  try {
+    const response = await fetch(`${CALENDAR_API_BASE}/calendars/${calendarId}/events/${eventId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(eventData),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Calendar API error: ${response.status} ${response.statusText}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error updating calendar event:', error)
+    return null
+  }
+}

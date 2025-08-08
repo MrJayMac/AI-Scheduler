@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import GoogleCalendarConnect from '../components/GoogleCalendarConnect'
-import CalendarEvents from '../components/CalendarEvents'
 import TaskInput from '../components/TaskInput'
 import TaskList from '../components/TaskList'
 import ScheduleView from '../components/ScheduleView'
@@ -56,7 +55,6 @@ export default function DashboardPage() {
     <div style={{ padding: '20px' }}>
       <h1>Welcome {userEmail}</h1>
       <GoogleCalendarConnect />
-      <CalendarEvents />
       <TaskInput onTaskAdded={handleTaskAdded} />
       <TaskList 
         refreshTrigger={taskRefreshTrigger} 

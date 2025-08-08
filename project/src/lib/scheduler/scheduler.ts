@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { CalendarEvent } from '@/lib/google/calendar-server'
 
 export interface Task {
   id: string
@@ -7,19 +8,6 @@ export interface Task {
   deadline: string | null
   priority: 'low' | 'medium' | 'high'
   status: string
-}
-
-export interface CalendarEvent {
-  id: string
-  summary: string
-  start: {
-    dateTime?: string
-    date?: string
-  }
-  end: {
-    dateTime?: string
-    date?: string
-  }
 }
 
 export interface TimeWindow {
@@ -65,8 +53,11 @@ export async function generateSchedule(userId: string, calendarEvents: CalendarE
       }
     }
 
+    // Get locked time blocks to preserve them during scheduling
+    const lockedBlocks = await getLockedTimeBlocks(userId)
+    
     const sortedTasks = sortTasksByPriority(tasks)
-    const freeWindows = findFreeTimeWindows(calendarEvents)
+    const freeWindows = findFreeTimeWindows(calendarEvents, lockedBlocks)
     const scheduledTasks = scheduleTasksInWindows(sortedTasks, freeWindows)
     
     const scheduled = scheduledTasks.filter(st => st.scheduled)
@@ -105,6 +96,27 @@ async function getPendingTasks(userId: string): Promise<Task[]> {
   return tasks || []
 }
 
+async function getLockedTimeBlocks(userId: string): Promise<{ start: Date; end: Date }[]> {
+  const supabase = await createClient()
+  
+  const { data: lockedBlocks, error } = await supabase
+    .from('time_blocks')
+    .select('start_time, end_time')
+    .eq('user_id', userId)
+    .eq('locked', true)
+    .eq('status', 'scheduled')
+
+  if (error) {
+    console.error('Error fetching locked blocks:', error)
+    return []
+  }
+
+  return (lockedBlocks || []).map(block => ({
+    start: new Date(block.start_time),
+    end: new Date(block.end_time)
+  }))
+}
+
 
 
 function sortTasksByPriority(tasks: Task[]): Task[] {
@@ -122,19 +134,22 @@ function sortTasksByPriority(tasks: Task[]): Task[] {
   })
 }
 
-function findFreeTimeWindows(events: CalendarEvent[]): TimeWindow[] {
+function findFreeTimeWindows(events: CalendarEvent[], lockedBlocks: { start: Date; end: Date }[] = []): TimeWindow[] {
   const windows: TimeWindow[] = []
   const now = new Date()
   const endOfWeek = new Date(now)
   endOfWeek.setDate(now.getDate() + 7)
   
-  const busyTimes = events
-    .filter(event => event.start.dateTime && event.end.dateTime)
-    .map(event => ({
-      start: new Date(event.start.dateTime!),
-      end: new Date(event.end.dateTime!)
-    }))
-    .sort((a, b) => a.start.getTime() - b.start.getTime())
+  // Combine Google Calendar events and locked time blocks as busy times
+  const busyTimes = [
+    ...events
+      .filter(event => event.start.dateTime && event.end.dateTime)
+      .map(event => ({
+        start: new Date(event.start.dateTime!),
+        end: new Date(event.end.dateTime!)
+      })),
+    ...lockedBlocks
+  ].sort((a, b) => a.start.getTime() - b.start.getTime())
 
   for (let day = 0; day < 7; day++) {
     const currentDay = new Date(now)
@@ -257,10 +272,12 @@ export async function saveScheduledTasks(userId: string, scheduledTasks: Schedul
   try {
     const supabase = await createClient()
     
+    // Only delete unlocked time_blocks to preserve manually edited ones
     await supabase
       .from('time_blocks')
       .delete()
       .eq('user_id', userId)
+      .eq('locked', false)
     
     const scheduledTasksFiltered = scheduledTasks.filter(st => st.scheduled)
     
