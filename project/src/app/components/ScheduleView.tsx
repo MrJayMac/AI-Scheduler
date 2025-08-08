@@ -39,19 +39,31 @@ interface ScheduleResult {
 interface ScheduleViewProps {
   refreshTrigger?: number
   onScheduleGenerated?: () => void
+  taskAddedTrigger?: number
 }
 
-export default function ScheduleView({ refreshTrigger, onScheduleGenerated }: ScheduleViewProps) {
+export default function ScheduleView({ refreshTrigger, onScheduleGenerated, taskAddedTrigger }: ScheduleViewProps) {
   const supabase = createClient()
   const [timeBlocks, setTimeBlocks] = useState<TimeBlock[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [lastResult, setLastResult] = useState<ScheduleResult | null>(null)
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
+  const [recomputing, setRecomputing] = useState(false)
+  const [showReschedulePrompt, setShowReschedulePrompt] = useState(false)
 
   useEffect(() => {
     fetchSchedule()
   }, [refreshTrigger || 0])
+
+  useEffect(() => {
+    // Auto-trigger reschedule suggestion when new tasks are added
+    if (taskAddedTrigger && taskAddedTrigger > 0 && timeBlocks.length > 0) {
+      setShowReschedulePrompt(true)
+      // Auto-hide the prompt after 10 seconds
+      setTimeout(() => setShowReschedulePrompt(false), 10000)
+    }
+  }, [taskAddedTrigger, timeBlocks.length])
 
   const fetchSchedule = async () => {
     setLoading(true)
@@ -140,6 +152,32 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated }: Sc
     }
   }
 
+  const recomputeSchedule = async () => {
+    if (recomputing) return
+    
+    const confirmed = confirm('This will clear your current schedule and generate a new one based on all pending tasks. Continue?')
+    if (!confirmed) return
+    
+    try {
+      setRecomputing(true)
+      
+      // First, clear the existing schedule
+      await clearSchedule()
+      
+      // Wait a moment for the clear to complete
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Then generate a new schedule
+      await generateSchedule()
+      
+    } catch (error) {
+      console.error('Error recomputing schedule:', error)
+      alert('Failed to recompute schedule')
+    } finally {
+      setRecomputing(false)
+    }
+  }
+
   const formatTime = (timeString: string) => {
     return new Date(timeString).toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -187,6 +225,56 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated }: Sc
 
   return (
     <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', margin: '20px 0' }}>
+      {showReschedulePrompt && (
+        <div style={{ 
+          padding: '15px', 
+          backgroundColor: '#fff3cd', 
+          border: '1px solid #ffeaa7', 
+          borderRadius: '4px', 
+          marginBottom: '15px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <strong>New tasks added!</strong> Would you like to reschedule to include them?
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => {
+                setShowReschedulePrompt(false)
+                recomputeSchedule()
+              }}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#28a745',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Yes, Reschedule
+            </button>
+            <button
+              onClick={() => setShowReschedulePrompt(false)}
+              style={{
+                padding: '6px 12px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Not Now
+            </button>
+          </div>
+        </div>
+      )}
+      
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h3>AI Generated Schedule</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
@@ -205,19 +293,36 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated }: Sc
             {generating ? 'Generating...' : 'Generate Schedule'}
           </button>
           {timeBlocks.length > 0 && (
-            <button 
-              onClick={clearSchedule}
-              style={{ 
-                padding: '10px 20px', 
-                backgroundColor: '#dc3545', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            >
-              Clear Schedule
-            </button>
+            <>
+              <button 
+                onClick={recomputeSchedule}
+                disabled={recomputing || generating}
+                style={{ 
+                  padding: '10px 20px', 
+                  backgroundColor: recomputing ? '#ccc' : '#28a745', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px',
+                  cursor: recomputing || generating ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {recomputing ? 'Recomputing...' : 'Reschedule'}
+              </button>
+              <button 
+                onClick={clearSchedule}
+                disabled={generating || recomputing}
+                style={{ 
+                  padding: '10px 20px', 
+                  backgroundColor: '#dc3545', 
+                  color: 'white', 
+                  border: 'none', 
+                  borderRadius: '4px',
+                  cursor: generating || recomputing ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Clear Schedule
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0)
   const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = useState(0)
   const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState(0)
+  const [taskAddedTrigger, setTaskAddedTrigger] = useState(0)
 
   useEffect(() => {
     const getUser = async () => {
@@ -37,6 +38,7 @@ export default function DashboardPage() {
 
   const handleTaskAdded = () => {
     setTaskRefreshTrigger(prev => prev + 1)
+    setTaskAddedTrigger(prev => prev + 1)
   }
 
   const handleTaskDeleted = () => {
@@ -59,7 +61,11 @@ export default function DashboardPage() {
       <TaskList 
         refreshTrigger={taskRefreshTrigger} 
       />
-      <ScheduleView refreshTrigger={scheduleRefreshTrigger} onScheduleGenerated={handleScheduleGenerated} />
+      <ScheduleView 
+        refreshTrigger={scheduleRefreshTrigger} 
+        onScheduleGenerated={handleScheduleGenerated}
+        taskAddedTrigger={taskAddedTrigger}
+      />
       <CalendarView refreshTrigger={calendarRefreshTrigger} />
     </div>
   )

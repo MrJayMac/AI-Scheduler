@@ -146,7 +146,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
   const formatTimeBlocks = (timeBlocks: TimeBlock[]): CalendarEvent[] => {
     return timeBlocks.map(block => ({
       id: `ai-task-${block.id}`,
-      title: `🤖 ${block.task_title}`,
+      title: `AI: ${block.task_title}`,
       start: new Date(block.start_time),
       end: new Date(block.end_time),
       resource: {
@@ -204,7 +204,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
 
   const handleSelectEvent = (event: CalendarEvent) => {
     if (event.resource.type === 'ai-task') {
-      alert(`AI Scheduled Task: ${event.title.replace('🤖 ', '')}\nPriority: ${event.resource.priority}\nDuration: ${moment(event.end).diff(moment(event.start), 'minutes')} minutes`)
+      alert(`AI Scheduled Task: ${event.title.replace('AI: ', '')}\nPriority: ${event.resource.priority}\nDuration: ${moment(event.end).diff(moment(event.start), 'minutes')} minutes`)
     } else {
       alert(`Google Calendar Event: ${event.title}`)
     }
@@ -310,8 +310,8 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
       </div>
       
       <div style={{ marginTop: '15px', color: '#666', fontSize: '14px' }}>
-        <p>📅 Showing {events.filter(e => e.resource.type === 'google').length} Google Calendar events and {events.filter(e => e.resource.type === 'ai-task').length} AI scheduled tasks</p>
-        <p>💡 Click on any event to view details</p>
+        <p>Showing {events.filter(e => e.resource.type === 'google').length} Google Calendar events and {events.filter(e => e.resource.type === 'ai-task').length} AI scheduled tasks</p>
+        <p>Click on any event to view details</p>
       </div>
     </div>
   )
