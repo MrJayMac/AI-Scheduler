@@ -5,9 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 
 interface TaskInputProps {
   onTaskAdded?: () => void
+  onScheduleGenerated?: () => void
 }
 
-export default function TaskInput({ onTaskAdded }: TaskInputProps) {
+export default function TaskInput({ onTaskAdded, onScheduleGenerated }: TaskInputProps) {
   const supabase = createClient()
   const [taskInput, setTaskInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -54,6 +55,9 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
         setTaskInput('')
         setSuccess(`Task created successfully! Title: "${result.task.title}"`)
         onTaskAdded?.()
+        
+        // Auto-generate schedule for just-created task
+        await generateScheduleAutomatically(result.task.id)
       } else {
         setError(result.error || 'Failed to create task')
       }
@@ -63,6 +67,32 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
       setError(error instanceof Error ? error.message : 'Failed to create task')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const generateScheduleAutomatically = async (taskId: string) => {
+    try {
+      const response = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId })
+      })
+      const data = await response.json()
+      
+      if (data.success) {
+        // Notify parent components that schedule was generated
+        onScheduleGenerated?.()
+        
+        // Update success message to include scheduling results
+        setSuccess(prev => 
+          `${prev} Schedule updated! ${data.scheduledCount} tasks scheduled, ${data.unscheduledCount} couldn't be scheduled.`
+        )
+      } else {
+        setError('Task created but failed to update schedule: ' + (data.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error auto-generating schedule:', error)
+      setError('Task created but failed to update schedule')
     }
   }
 
@@ -144,10 +174,10 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
       <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
         <p><strong>Examples:</strong></p>
         <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-          <li>"Finish the presentation by Friday"</li>
-          <li>"Quick call with John tomorrow"</li>
-          <li>"URGENT: Review contract by end of week"</li>
-          <li>"Schedule dentist appointment"</li>
+          <li>Finish the presentation by Friday</li>
+          <li>Quick call with John tomorrow</li>
+          <li>URGENT: Review contract by end of week</li>
+          <li>Schedule dentist appointment</li>
         </ul>
       </div>
     </div>

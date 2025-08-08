@@ -26,6 +26,15 @@ interface CalendarEvent {
   }
 }
 
+// Types for react-big-calendar drag-and-drop callbacks
+interface DnDEventArgs<TEvent> {
+  event: TEvent
+  start: Date | string
+  end: Date | string
+  allDay?: boolean
+  isAllDay?: boolean
+}
+
 interface TimeBlock {
   id: string
   task_id: string
@@ -139,16 +148,23 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
   }
 
   const formatGoogleEvents = (googleEvents: GoogleCalendarEvent[]): CalendarEvent[] => {
-    return googleEvents.map(event => ({
-      id: `google-${event.id}`,
-      title: event.summary || 'Untitled Event',
-      start: new Date(event.start.dateTime || event.start.date || ''),
-      end: new Date(event.end.dateTime || event.end.date || ''),
-      resource: {
-        type: 'google' as const,
-        googleEventId: event.id
-      }
-    }))
+    return googleEvents
+      .filter(event => {
+        // Filter out AI-created events to prevent duplicates
+        // AI events have titles starting with "AI:" or "🔒 AI:"
+        const title = event.summary || ''
+        return !title.startsWith('AI:') && !title.startsWith('🔒 AI:')
+      })
+      .map(event => ({
+        id: `google-${event.id}`,
+        title: event.summary || 'Untitled Event',
+        start: new Date(event.start.dateTime || event.start.date || ''),
+        end: new Date(event.end.dateTime || event.end.date || ''),
+        resource: {
+          type: 'google' as const,
+          googleEventId: event.id
+        }
+      }))
   }
 
   const formatTimeBlocks = (timeBlocks: TimeBlock[]): CalendarEvent[] => {
@@ -230,7 +246,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
     return event.resource.type === 'ai-task'
   }
 
-  const handleEventDrop = async (args: any) => {
+  const handleEventDrop = async (args: DnDEventArgs<CalendarEvent>) => {
     const { event, start, end } = args
     const startDate = new Date(start)
     const endDate = new Date(end)
@@ -266,7 +282,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
     }
   }
 
-  const handleEventResize = async (args: any) => {
+  const handleEventResize = async (args: DnDEventArgs<CalendarEvent>) => {
     const { event, start, end } = args
     const startDate = new Date(start)
     const endDate = new Date(end)

@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import GoogleCalendarConnect from '../components/GoogleCalendarConnect'
 import TaskInput from '../components/TaskInput'
-import TaskList from '../components/TaskList'
 import ScheduleView from '../components/ScheduleView'
 import CalendarView from '../components/CalendarView'
 
@@ -14,7 +13,7 @@ export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0)
+  // TaskList component removed - no longer needed with auto-scheduling
   const [scheduleRefreshTrigger, setScheduleRefreshTrigger] = useState(0)
   const [calendarRefreshTrigger, setCalendarRefreshTrigger] = useState(0)
   const [taskAddedTrigger, setTaskAddedTrigger] = useState(0)
@@ -36,29 +35,44 @@ export default function DashboardPage() {
   }, [supabase, router])
 
   const handleTaskAdded = () => {
-    setTaskRefreshTrigger(prev => prev + 1)
     setTaskAddedTrigger(prev => prev + 1)
   }
 
   const handleTaskDeleted = () => {
-    setTaskRefreshTrigger(prev => prev + 1)
     setScheduleRefreshTrigger(prev => prev + 1)
     setCalendarRefreshTrigger(prev => prev + 1)
   }
 
   const handleScheduleGenerated = () => {
-    setScheduleRefreshTrigger(prev => prev + 1)
-    setCalendarRefreshTrigger(prev => prev + 1)
+    setScheduleRefreshTrigger(prev => prev + 1)  // Refresh ScheduleView to show new schedule
+    setCalendarRefreshTrigger(prev => prev + 1)  // Refresh CalendarView to show new events
   }
 
   return (
     <div style={{ padding: '20px' }}>
-      <h1>Welcome {userEmail}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1>Welcome {userEmail}</h1>
+        <button 
+          onClick={() => router.push('/preferences')}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px'
+          }}
+        >
+          ⚙️ Preferences
+        </button>
+      </div>
       <GoogleCalendarConnect />
-      <TaskInput onTaskAdded={handleTaskAdded} />
-      <TaskList 
-        refreshTrigger={taskRefreshTrigger} 
+      <TaskInput 
+        onTaskAdded={handleTaskAdded} 
+        onScheduleGenerated={handleScheduleGenerated}
       />
+
       <ScheduleView 
         refreshTrigger={scheduleRefreshTrigger} 
         onScheduleGenerated={handleScheduleGenerated}

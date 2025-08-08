@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateSchedule, saveScheduledTasks } from '@/lib/scheduler/scheduler'
-import { getCalendarEvents, createCalendarEvent, deleteCalendarEvent } from '@/lib/google/calendar-server'
+import { getCalendarEvents, deleteCalendarEvent } from '@/lib/google/calendar-server'
+import type { Task } from '@/lib/scheduler/scheduler'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +17,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get this week's calendar events
     const now = new Date()
     const startOfWeek = new Date(now)
     startOfWeek.setDate(now.getDate() - now.getDay())
@@ -31,7 +31,37 @@ export async function POST(request: NextRequest) {
       timeMax: endOfWeek.toISOString()
     }) || []
 
-    const scheduleResult = await generateSchedule(user.id, calendarEvents)
+    // Optional: single-task scheduling via JSON body { taskId }
+    interface ScheduleBody { taskId?: string }
+    let body: ScheduleBody | null = null
+    try { body = await request.json() as ScheduleBody } catch { /* no body provided */ }
+    const taskId: string | undefined = body?.taskId
+
+    let tasksOverride: Task[] | undefined = undefined
+    if (taskId) {
+      const { data: singleTask, error: taskError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('id', taskId)
+        .eq('status', 'pending')
+        .single()
+
+      if (!taskError && singleTask) {
+        tasksOverride = [singleTask]
+      } else {
+        // If task not found or not pending, return no-op success
+        return NextResponse.json({
+          success: true,
+          scheduledCount: 0,
+          unscheduledCount: 0,
+          scheduledTasks: [],
+          unscheduledTasks: []
+        })
+      }
+    }
+
+    const scheduleResult = await generateSchedule(user.id, calendarEvents, tasksOverride)
     
     if (!scheduleResult.success) {
       return NextResponse.json(
@@ -40,8 +70,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Save scheduled tasks if any exist
     if (scheduleResult.scheduledTasks.length > 0) {
-      const saved = await saveScheduledTasks(user.id, scheduleResult.scheduledTasks)
+      const saved = await saveScheduledTasks(
+        user.id,
+        scheduleResult.scheduledTasks,
+        tasksOverride ? 'tasks' : 'all'
+      )
       
       if (!saved) {
         return NextResponse.json(
@@ -49,43 +84,17 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         )
       }
+    }
 
-      // Create Google Calendar events and update time_blocks with google_event_id
-      const scheduledTaskIds: string[] = []
-      for (const st of scheduleResult.scheduledTasks) {
-        try {
-          const googleEvent = await createCalendarEvent({
-            summary: st.task.title,
-            description: `Priority: ${st.task.priority}\nDuration: ${st.task.duration_min} minutes`,
-            start: {
-              dateTime: st.startTime.toISOString(),
-              timeZone: 'America/New_York'
-            },
-            end: {
-              dateTime: st.endTime.toISOString(),
-              timeZone: 'America/New_York'
-            }
-          })
-
-          if (googleEvent) {
-            // Update the time_block with the Google event ID
-            await supabase
-              .from('time_blocks')
-              .update({ google_event_id: googleEvent.id })
-              .eq('user_id', user.id)
-              .eq('task_id', st.task.id)
-              .eq('start_time', st.startTime.toISOString())
-            
-            // Track successfully scheduled tasks
-            scheduledTaskIds.push(st.task.id)
-          }
-        } catch (error) {
-          console.error('Failed to create Google Calendar event:', error)
-          // Continue with other events even if one fails
-        }
-      }
-
-      // Mark successfully scheduled tasks as 'scheduled' status
+    // Update ALL tasks (both scheduled and unscheduled) to remove them from "Tasks to Add"
+    const allTaskIds = [
+      ...scheduleResult.scheduledTasks.map(st => st.task.id),
+      ...scheduleResult.unscheduledTasks.map(task => task.id)
+    ]
+    
+    if (allTaskIds.length > 0) {
+      // Mark scheduled tasks as 'scheduled'
+      const scheduledTaskIds = scheduleResult.scheduledTasks.map(st => st.task.id)
       if (scheduledTaskIds.length > 0) {
         await supabase
           .from('tasks')
@@ -93,7 +102,16 @@ export async function POST(request: NextRequest) {
           .eq('user_id', user.id)
           .in('id', scheduledTaskIds)
       }
-
+      
+      // Mark unscheduled tasks as 'unscheduled' to remove them from "Tasks to Add"
+      const unscheduledTaskIds = scheduleResult.unscheduledTasks.map(task => task.id)
+      if (unscheduledTaskIds.length > 0) {
+        await supabase
+          .from('tasks')
+          .update({ status: 'unscheduled' })
+          .eq('user_id', user.id)
+          .in('id', unscheduledTaskIds)
+      }
     }
 
     return NextResponse.json({
@@ -118,6 +136,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
+    console.error('Error in POST /api/schedule:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -125,7 +144,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createClient()
     
@@ -165,7 +184,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE(_request: NextRequest) {
   try {
     const supabase = await createClient()
     
@@ -194,7 +213,7 @@ export async function DELETE(request: NextRequest) {
       for (const block of timeBlocks) {
         if (block.google_event_id) {
           try {
-            await deleteCalendarEvent(block.google_event_id)
+            await deleteCalendarEvent({ eventId: block.google_event_id })
           } catch (error) {
             console.error('Failed to delete Google Calendar event:', error)
             // Continue with other deletions even if one fails

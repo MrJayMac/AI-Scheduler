@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { CalendarEvent } from '@/lib/google/calendar-server'
+import { getUserPreferences, UserPreferences, isWithinWorkingHours, isWeekend, isWithinFocusWindow, isWithinLunchBreak, getWorkdayStart, getWorkdayEnd } from '@/lib/preferences/preferences-server'
 
 export interface Task {
   id: string
@@ -8,6 +9,26 @@ export interface Task {
   deadline: string | null
   priority: 'low' | 'medium' | 'high'
   status: string
+}
+
+async function getScheduledTimeBlocks(userId: string): Promise<{ start: Date; end: Date }[]> {
+  const supabase = await createClient()
+  
+  const { data: blocks, error } = await supabase
+    .from('time_blocks')
+    .select('start_time, end_time')
+    .eq('user_id', userId)
+    .eq('status', 'scheduled')
+
+  if (error) {
+    console.error('Error fetching scheduled blocks:', error)
+    return []
+  }
+
+  return (blocks || []).map(b => ({
+    start: new Date(b.start_time),
+    end: new Date(b.end_time)
+  }))
 }
 
 export interface TimeWindow {
@@ -41,9 +62,11 @@ const WORKING_HOURS = {
   end: 17
 }
 
-export async function generateSchedule(userId: string, calendarEvents: CalendarEvent[]): Promise<ScheduleResult> {
+export async function generateSchedule(userId: string, calendarEvents: CalendarEvent[], tasksOverride?: Task[]): Promise<ScheduleResult> {
   try {
-    const tasks = await getPendingTasks(userId)
+    const tasks = (tasksOverride && tasksOverride.length > 0)
+      ? tasksOverride
+      : await getPendingTasks(userId)
     
     if (!tasks.length) {
       return {
@@ -53,12 +76,16 @@ export async function generateSchedule(userId: string, calendarEvents: CalendarE
       }
     }
 
-    // Get locked time blocks to preserve them during scheduling
+    // Get user preferences and busy time blocks
+    const preferences = await getUserPreferences(userId)
     const lockedBlocks = await getLockedTimeBlocks(userId)
+    // When scheduling a subset (e.g., single task), also treat existing scheduled blocks as busy to avoid overlaps
+    const existingScheduled = tasksOverride ? await getScheduledTimeBlocks(userId) : []
+    const occupiedBlocks = tasksOverride ? [...lockedBlocks, ...existingScheduled] : lockedBlocks
     
     const sortedTasks = sortTasksByPriority(tasks)
-    const freeWindows = findFreeTimeWindows(calendarEvents, lockedBlocks)
-    const scheduledTasks = scheduleTasksInWindows(sortedTasks, freeWindows)
+    const freeWindows = findFreeTimeWindows(calendarEvents, occupiedBlocks, preferences)
+    const scheduledTasks = scheduleTasksInWindows(sortedTasks, freeWindows, preferences)
     
     const scheduled = scheduledTasks.filter(st => st.scheduled)
     const unscheduled = scheduledTasks.filter(st => !st.scheduled).map(st => st.task)
@@ -134,7 +161,7 @@ function sortTasksByPriority(tasks: Task[]): Task[] {
   })
 }
 
-function findFreeTimeWindows(events: CalendarEvent[], lockedBlocks: { start: Date; end: Date }[] = []): TimeWindow[] {
+function findFreeTimeWindows(events: CalendarEvent[], lockedBlocks: { start: Date; end: Date }[] = [], preferences?: UserPreferences): TimeWindow[] {
   const windows: TimeWindow[] = []
   const now = new Date()
   const endOfWeek = new Date(now)
@@ -155,15 +182,19 @@ function findFreeTimeWindows(events: CalendarEvent[], lockedBlocks: { start: Dat
     const currentDay = new Date(now)
     currentDay.setDate(now.getDate() + day)
     
-    if (currentDay.getDay() === 0 || currentDay.getDay() === 6) {
+    // Skip weekends unless allowed by preferences
+    if (isWeekend(currentDay) && preferences && !preferences.allow_weekend_scheduling) {
       continue
     }
     
-    const dayStart = new Date(currentDay)
-    dayStart.setHours(WORKING_HOURS.start, 0, 0, 0)
+    // Use preferences for workday hours, fallback to defaults
+    const dayStart = preferences ? getWorkdayStart(currentDay, preferences) : new Date(currentDay)
+    const dayEnd = preferences ? getWorkdayEnd(currentDay, preferences) : new Date(currentDay)
     
-    const dayEnd = new Date(currentDay)
-    dayEnd.setHours(WORKING_HOURS.end, 0, 0, 0)
+    if (!preferences) {
+      dayStart.setHours(9, 0, 0, 0) // Default 9 AM
+      dayEnd.setHours(17, 0, 0, 0)  // Default 5 PM
+    }
     
     const dayBusyTimes = busyTimes.filter(busy => 
       busy.start.toDateString() === currentDay.toDateString()
@@ -210,7 +241,7 @@ function findFreeTimeWindows(events: CalendarEvent[], lockedBlocks: { start: Dat
   return windows.sort((a, b) => a.start.getTime() - b.start.getTime())
 }
 
-function scheduleTasksInWindows(tasks: Task[], windows: TimeWindow[]): ScheduledTask[] {
+function scheduleTasksInWindows(tasks: Task[], windows: TimeWindow[], preferences?: UserPreferences): ScheduledTask[] {
   const scheduledTasks: ScheduledTask[] = []
   const availableWindows = [...windows]
   
@@ -268,16 +299,33 @@ function scheduleTasksInWindows(tasks: Task[], windows: TimeWindow[]): Scheduled
   return scheduledTasks
 }
 
-export async function saveScheduledTasks(userId: string, scheduledTasks: ScheduledTask[]): Promise<boolean> {
+export async function saveScheduledTasks(
+  userId: string,
+  scheduledTasks: ScheduledTask[],
+  deleteScope: 'all' | 'tasks' = 'all'
+): Promise<boolean> {
   try {
     const supabase = await createClient()
     
-    // Only delete unlocked time_blocks to preserve manually edited ones
-    await supabase
-      .from('time_blocks')
-      .delete()
-      .eq('user_id', userId)
-      .eq('locked', false)
+    if (deleteScope === 'all') {
+      // Full reschedule: remove all unlocked blocks
+      await supabase
+        .from('time_blocks')
+        .delete()
+        .eq('user_id', userId)
+        .eq('locked', false)
+    } else {
+      // Single-task scheduling: remove only affected tasks' unlocked blocks
+      const targetTaskIds = scheduledTasks.map(st => st.task.id)
+      if (targetTaskIds.length > 0) {
+        await supabase
+          .from('time_blocks')
+          .delete()
+          .eq('user_id', userId)
+          .eq('locked', false)
+          .in('task_id', targetTaskIds)
+      }
+    }
     
     const scheduledTasksFiltered = scheduledTasks.filter(st => st.scheduled)
     

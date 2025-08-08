@@ -52,6 +52,7 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
   const [recomputing, setRecomputing] = useState(false)
   const [showReschedulePrompt, setShowReschedulePrompt] = useState(false)
+  const [purging, setPurging] = useState(false)
 
   useEffect(() => {
     fetchSchedule()
@@ -128,6 +129,32 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
     } catch (error) {
       console.error('Error clearing schedule:', error)
       alert('Failed to clear schedule')
+    }
+  }
+
+  const purgeAllTasks = async () => {
+    const confirmed = confirm('This will delete ALL tasks and AI time blocks, and remove their Google Calendar events. This cannot be undone. Continue?')
+    if (!confirmed) return
+
+    try {
+      setPurging(true)
+      const response = await fetch('/api/tasks/purge', { method: 'DELETE' })
+      const data = await response.json()
+
+      if (data.success) {
+        setTimeBlocks([])
+        setLastResult(null)
+        // Notify parent to refresh any dependent views
+        onTaskDeleted?.()
+        alert('All tasks and AI blocks deleted successfully')
+      } else {
+        alert('Failed to delete all tasks: ' + (data.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error deleting all tasks:', error)
+      alert('Failed to delete all tasks')
+    } finally {
+      setPurging(false)
     }
   }
 
@@ -283,20 +310,6 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h3>AI Generated Schedule</h3>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={generateSchedule}
-            disabled={generating}
-            style={{ 
-              padding: '10px 20px', 
-              backgroundColor: generating ? '#ccc' : '#007bff', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '4px',
-              cursor: generating ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {generating ? 'Generating...' : 'Generate Schedule'}
-          </button>
           {timeBlocks.length > 0 && (
             <>
               <button 
@@ -329,6 +342,20 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
               </button>
             </>
           )}
+          <button
+            onClick={purgeAllTasks}
+            disabled={generating || recomputing || purging}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: purging ? '#ccc' : '#b02a37',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: (generating || recomputing || purging) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {purging ? 'Deleting…' : 'Delete All Tasks'}
+          </button>
         </div>
       </div>
 
@@ -346,7 +373,7 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
           </p>
           {lastResult.unscheduledCount > 0 && (
             <p style={{ margin: '5px 0', color: '#dc3545' }}>
-              ⚠️ {lastResult.unscheduledCount} tasks couldn't be scheduled
+              ⚠️ {lastResult.unscheduledCount} tasks could not be scheduled
             </p>
           )}
         </div>
@@ -355,7 +382,7 @@ export default function ScheduleView({ refreshTrigger, onScheduleGenerated, task
       {timeBlocks.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#6c757d' }}>
           <p>No scheduled tasks yet.</p>
-          <p>Add some tasks and click "Generate Schedule" to get started!</p>
+          <p>Add some tasks above and your schedule will be generated automatically!</p>
         </div>
       ) : (
         <div>
