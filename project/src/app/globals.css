@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* Global reset and base styles */
 * , *::before, *::after { box-sizing: border-box; }
 
@@ -12,4 +16,26 @@ body {
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tailwind component styles for login form without editing AuthForm */
+@layer components {
+  .login-card input {
+    @apply w-full max-w-full bg-white/5 border border-slate-400/25 text-slate-200 px-4 py-3 rounded-lg outline-none transition duration-200 ease-in-out my-2 placeholder:text-slate-500 focus:border-violet-400/50 focus:ring-4 focus:ring-violet-500/20 focus:bg-white/10;
+  }
+
+  .login-card button {
+    @apply w-full appearance-none border-0 text-white cursor-pointer py-3 px-4 rounded-xl font-bold tracking-wide bg-gradient-to-r from-indigo-500 via-emerald-500 to-pink-500 shadow-[0_10px_30px_rgba(99,102,241,.25)] transition transform mt-3 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(236,72,153,.25)] disabled:opacity-60 disabled:cursor-not-allowed;
+    background-size: 200% 100%;
+  }
+
+  .login-card button:hover { background-position: 100% 0; }
+
+  .login-card h2 {
+    @apply text-slate-200 text-base font-semibold mb-2;
+  }
+
+  .login-card p[style] {
+    @apply mt-2 text-sm;
+  }
 }
