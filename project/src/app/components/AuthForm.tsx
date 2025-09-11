@@ -30,8 +30,6 @@ export default function AuthForm() {
 
   return (
     <div>
-      <h2>Login</h2>
-
       <input
         type="email"
         placeholder="Email"

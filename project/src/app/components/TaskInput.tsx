@@ -5,10 +5,9 @@ import { createClient } from '@/lib/supabase/client'
 
 interface TaskInputProps {
   onTaskAdded?: () => void
-  onScheduleGenerated?: () => void
 }
 
-export default function TaskInput({ onTaskAdded, onScheduleGenerated }: TaskInputProps) {
+export default function TaskInput({ onTaskAdded }: TaskInputProps) {
   const supabase = createClient()
   const [taskInput, setTaskInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,32 +34,27 @@ export default function TaskInput({ onTaskAdded, onScheduleGenerated }: TaskInpu
         return
       }
 
-      const response = await fetch('/api/tasks', {
+      // Minimal flow: create a Google Calendar event now with default 60 min duration
+      const startISO = new Date().toISOString()
+      const response = await fetch('/api/calendar/events', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskInput: taskInput.trim()
+          summary: taskInput.trim(),
+          startDateTime: startISO,
+          durationMin: 60,
         }),
       })
 
       const result = await response.json()
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create task')
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create calendar event (connect Google Calendar?)')
       }
 
-      if (result.success) {
-        setTaskInput('')
-        setSuccess(`Task created successfully! Title: "${result.task.title}"`)
-        onTaskAdded?.()
-        
-        // Auto-generate schedule for just-created task
-        await generateScheduleAutomatically(result.task.id)
-      } else {
-        setError(result.error || 'Failed to create task')
-      }
+      setTaskInput('')
+      setSuccess('Event added to your calendar')
+      onTaskAdded?.()
 
     } catch (error) {
 
@@ -70,31 +64,7 @@ export default function TaskInput({ onTaskAdded, onScheduleGenerated }: TaskInpu
     }
   }
 
-  const generateScheduleAutomatically = async (taskId: string) => {
-    try {
-      const response = await fetch('/api/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId })
-      })
-      const data = await response.json()
-      
-      if (data.success) {
-        // Notify parent components that schedule was generated
-        onScheduleGenerated?.()
-        
-        // Update success message to include scheduling results
-        setSuccess(prev => 
-          `${prev} Schedule updated! ${data.scheduledCount} tasks scheduled, ${data.unscheduledCount} couldn't be scheduled.`
-        )
-      } else {
-        setError('Task created but failed to update schedule: ' + (data.error || 'Unknown error'))
-      }
-    } catch (error) {
-      console.error('Error auto-generating schedule:', error)
-      setError('Task created but failed to update schedule')
-    }
-  }
+  
 
   const clearMessages = () => {
     setError(null)
@@ -102,84 +72,39 @@ export default function TaskInput({ onTaskAdded, onScheduleGenerated }: TaskInpu
   }
 
   return (
-    <div style={{ padding: '20px', border: '1px solid #ccc', borderRadius: '8px', margin: '20px 0' }}>
-      <h3>Add New Task</h3>
-      
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <input
-            type="text"
-            value={taskInput}
-            onChange={(e) => {
-              setTaskInput(e.target.value)
-              clearMessages()
-            }}
-            placeholder="Add task... (e.g., 'Finish presentation by Friday', 'Call John tomorrow')"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px',
-              fontSize: '16px',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
-        
-        <button 
+    <div className="p-0">
+      <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={taskInput}
+          onChange={(e) => {
+            setTaskInput(e.target.value)
+            clearMessages()
+          }}
+          placeholder="Add a task and press Enter"
+          disabled={loading}
+          className="flex-1 rounded-md border border-slate-400/30 bg-slate-800/60 placeholder-slate-400 text-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/40 disabled:opacity-50"
+        />
+        <button
           type="submit"
           disabled={loading || !taskInput.trim()}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: loading || !taskInput.trim() ? '#ccc' : '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading || !taskInput.trim() ? 'not-allowed' : 'pointer',
-            fontSize: '16px',
-            fontWeight: 'bold'
-          }}
+          className={`${(loading || !taskInput.trim()) ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-500 text-white'} inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-semibold transition`}
         >
-          {loading ? 'Creating Task...' : 'Add Task'}
+          {loading ? 'Adding…' : 'Add'}
         </button>
       </form>
 
       {error && (
-        <div style={{
-          marginTop: '15px',
-          padding: '10px',
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          border: '1px solid #f5c6cb',
-          borderRadius: '4px'
-        }}>
+        <div className="mt-2 p-2 rounded-md border border-red-400/30 bg-red-500/10 text-red-200 text-xs">
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{
-          marginTop: '15px',
-          padding: '10px',
-          backgroundColor: '#d4edda',
-          color: '#155724',
-          border: '1px solid #c3e6cb',
-          borderRadius: '4px'
-        }}>
+        <div className="mt-2 p-2 rounded-md border border-emerald-400/30 bg-emerald-500/10 text-emerald-200 text-xs">
           {success}
         </div>
       )}
-
-      <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
-        <p><strong>Examples:</strong></p>
-        <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
-          <li>Finish the presentation by Friday</li>
-          <li>Quick call with John tomorrow</li>
-          <li>URGENT: Review contract by end of week</li>
-          <li>Schedule dentist appointment</li>
-        </ul>
-      </div>
     </div>
   )
 }

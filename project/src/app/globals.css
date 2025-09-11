@@ -1,9 +1,49 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@config "../../tailwind.config.js";
+@import "tailwindcss";
 
 /* Global reset and base styles */
 * , *::before, *::after { box-sizing: border-box; }
+
+/* React Big Calendar - Dark Theme Overrides */
+.rbc-theme-dark .rbc-calendar { background: transparent; color: #e5e7eb; }
+.rbc-theme-dark .rbc-time-view,
+.rbc-theme-dark .rbc-month-view,
+.rbc-theme-dark .rbc-agenda-view { border-color: rgba(148,163,184,.2) !important; }
+.rbc-theme-dark .rbc-time-header,
+.rbc-theme-dark .rbc-header { 
+  background: linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.45)) !important;
+  backdrop-filter: blur(10px);
+  border-color: rgba(148,163,184,.2) !important;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 12px;
+}
+.rbc-theme-dark .rbc-time-header-gutter { background: transparent; color: #94a3b8; }
+.rbc-theme-dark .rbc-time-content { background: transparent; border-top: 1px solid rgba(148,163,184,.18) !important; }
+.rbc-theme-dark .rbc-timeslot-group,
+.rbc-theme-dark .rbc-day-bg { border-color: rgba(148,163,184,.10) !important; }
+.rbc-theme-dark .rbc-time-slot { border-top: 1px solid rgba(148,163,184,.10) !important; }
+.rbc-theme-dark .rbc-timeslot-group { border-bottom: 1px solid rgba(148,163,184,.10) !important; }
+.rbc-theme-dark .rbc-day-bg + .rbc-day-bg { border-left: 1px solid rgba(148,163,184,.12) !important; }
+.rbc-theme-dark .rbc-today { background: rgba(99,102,241,.10) !important; }
+.rbc-theme-dark .rbc-off-range-bg { background-color: rgba(2,6,23,.5) !important; }
+.rbc-theme-dark .rbc-label { color: #94a3b8; }
+.rbc-theme-dark .rbc-header + .rbc-header { border-left: 1px solid rgba(148,163,184,.16) !important; }
+.rbc-theme-dark .rbc-time-gutter { 
+  border-right: 1px solid rgba(148,163,184,.16) !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+}
+.rbc-theme-dark .rbc-time-gutter .rbc-time-slot { border-top: 1px solid transparent !important; }
+.rbc-theme-dark .rbc-current-time-indicator { background: #8b5cf6; }
+.rbc-theme-dark .rbc-event { box-shadow: 0 6px 18px rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.15); }
+.rbc-theme-dark .rbc-selected-cell { background: rgba(99,102,241,.18); }
+.rbc-theme-dark .rbc-slot-selection { background: rgba(99,102,241,.18); }
+.rbc-theme-dark .rbc-event { transition: transform .15s ease, box-shadow .15s ease; }
+.rbc-theme-dark .rbc-event:hover { transform: translateY(-1px) scale(1.01); box-shadow: 0 10px 24px rgba(0,0,0,.45); }
+.rbc-theme-dark .rbc-time-view, .rbc-theme-dark .rbc-month-view { font-size: 12px; }
+.rbc-theme-dark .rbc-time-slot { height: 32px; }
+.rbc-theme-dark .rbc-allday-cell, .rbc-theme-dark .rbc-allday-events { display: none; }
 
 html, body {
   margin: 0;
