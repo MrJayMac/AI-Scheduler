@@ -35,7 +35,12 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
       }
 
       // Minimal flow: create a Google Calendar event now with default 60 min duration
-      const startISO = new Date().toISOString()
+      // Nudge start time to next 5-minute boundary for nicer placement
+      const now = new Date()
+      const minutes = now.getMinutes()
+      const rounded = minutes % 5 === 0 ? minutes : minutes + (5 - (minutes % 5))
+      now.setMinutes(rounded, 0, 0)
+      const startISO = now.toISOString()
       const response = await fetch('/api/calendar/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +54,8 @@ export default function TaskInput({ onTaskAdded }: TaskInputProps) {
       const result = await response.json()
 
       if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to create calendar event (connect Google Calendar?)')
+        const detail = typeof result?.error === 'string' ? result.error : response.statusText
+        throw new Error(`(${response.status}) ${detail}`)
       }
 
       setTaskInput('')

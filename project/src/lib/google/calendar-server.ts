@@ -146,6 +146,7 @@ export async function getCalendarEvents({
     const data = await response.json()
     return data.items || []
   } catch (error) {
+    console.error('getCalendarEvents error:', error)
     return null
   }
 }
