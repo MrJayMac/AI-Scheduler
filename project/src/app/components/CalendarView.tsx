@@ -157,8 +157,10 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
           console.error('Delete failed:', data)
           return
         }
-        // Refresh events
-        fetchAllEvents()
+        // Optimistically remove and invalidate cache, then refetch
+        setEvents(prev => prev.filter(e => e.id !== event.id))
+        cacheRef.current.clear()
+        void fetchAllEvents()
       } catch (e) {
         console.error('Error deleting event:', e)
       }
