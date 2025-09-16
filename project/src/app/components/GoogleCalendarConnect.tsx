@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { generateOAuthUrl } from '@/lib/google/oauth'
 
-export default function GoogleCalendarConnect() {
+interface GoogleCalendarConnectProps {
+  onStatusChange?: (connected: boolean) => void
+  refreshKey?: number
+  connectedOverride?: boolean
+}
+
+export default function GoogleCalendarConnect({ onStatusChange, refreshKey, connectedOverride }: GoogleCalendarConnectProps) {
   const supabase = createClient()
   const [isConnected, setIsConnected] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -41,8 +47,10 @@ export default function GoogleCalendarConnect() {
         console.error('Database error:', dbError)
         setIsConnected(false)
       } else {
-        setIsConnected(!!tokens?.access_token)
-        console.log('Connection check result:', !!tokens?.access_token)
+        const connected = !!tokens?.access_token
+        setIsConnected(connected)
+        onStatusChange?.(connected)
+        console.log('Connection check result:', connected)
       }
     } catch (error) {
       console.error('Error checking calendar connection:', error)
@@ -50,11 +58,11 @@ export default function GoogleCalendarConnect() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [supabase, onStatusChange])
 
   useEffect(() => {
     checkConnection()
-  }, [checkConnection])
+  }, [checkConnection, refreshKey])
 
   
 
@@ -64,22 +72,7 @@ export default function GoogleCalendarConnect() {
     window.location.href = oauthUrl
   }
 
-  const handleDisconnect = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      await supabase
-        .from('oauth_tokens')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('provider', 'google')
-
-      setIsConnected(false)
-    } catch (error) {
-      console.error('Error disconnecting calendar:', error)
-    }
-  }
+  
 
   if (loading) {
     return (
@@ -89,10 +82,12 @@ export default function GoogleCalendarConnect() {
     )
   }
 
+  const renderConnected = typeof connectedOverride === 'boolean' ? connectedOverride : isConnected
+
   return (
     <div className="p-0">
       <h3 className="m-0 text-base font-semibold mb-2">Google Calendar</h3>
-      {isConnected ? (
+      {renderConnected ? (
         <div className="flex items-center gap-3">
           <div className="pill pill-success">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -100,7 +95,6 @@ export default function GoogleCalendarConnect() {
             </svg>
             <span>Connected</span>
           </div>
-          <button onClick={handleDisconnect} className="btn btn-neutral">Disconnect</button>
         </div>
       ) : (
         <div className="space-y-3">

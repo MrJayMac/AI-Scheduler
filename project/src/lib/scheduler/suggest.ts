@@ -57,34 +57,42 @@ export async function suggestNextSlot(opts: {
 
     if (!prefs.allowWeekend && isWeekend(day)) continue
 
-    let cursor = d === 0 ? clampToWorkHours(now, prefs.workStartHour, prefs.workEndHour) : dayStart
+    const morningEnd = new Date(day)
+    morningEnd.setHours(Math.min(12, prefs.workEndHour), 0, 0, 0)
 
-    // Prefer morning means start scanning from the day's beginning already handled by cursor.
+    const tryFindGap = (windowStart: Date, windowEnd: Date): string | null => {
+      let cursor = d === 0 ? clampToWorkHours(now, prefs.workStartHour, prefs.workEndHour) : windowStart
+      if (cursor < windowStart) cursor = windowStart
+      if (cursor > windowEnd) return null
 
-    // Traverse busy blocks intersecting this day, checking gaps.
-    for (let i = 0; i <= busy.length; i++) {
-      const block = busy[i]
-      const nextBlockStart = block ? new Date(Math.max(block.start.getTime(), dayStart.getTime())) : dayEnd
+      for (let i = 0; i <= busy.length; i++) {
+        const block = busy[i]
+        const nextBlockStart = block ? new Date(Math.max(block.start.getTime(), windowStart.getTime())) : windowEnd
 
-      // if block is before 'cursor', move cursor forward
-      if (block && block.end <= cursor) continue
+        if (block && block.end <= cursor) continue
 
-      // Check gap between cursor and nextBlockStart
-      if (nextBlockStart.getTime() - cursor.getTime() >= durationMin * 60000) {
-        // Found a gap
-        return cursor.toISOString()
-      }
-
-      // Move cursor to end of this block if it overlaps today
-      if (block) {
-        const blockEndClamped = new Date(Math.min(block.end.getTime(), dayEnd.getTime()))
-        if (blockEndClamped > cursor) {
-          cursor = blockEndClamped
+        if (nextBlockStart.getTime() - cursor.getTime() >= durationMin * 60000) {
+          return cursor.toISOString()
         }
-        // If cursor passed end of day, break
-        if (cursor >= dayEnd) break
+
+        if (block) {
+          const blockEndClamped = new Date(Math.min(block.end.getTime(), windowEnd.getTime()))
+          if (blockEndClamped > cursor) cursor = blockEndClamped
+          if (cursor >= windowEnd) break
+        }
       }
+      return null
     }
+
+    // If preferMorning, first try morning window across days
+    if (prefs.preferMorning && morningEnd > dayStart) {
+      const found = tryFindGap(dayStart, morningEnd)
+      if (found) return found
+    }
+
+    // Fallback to full day
+    const foundFull = tryFindGap(dayStart, dayEnd)
+    if (foundFull) return foundFull
   }
 
   return null

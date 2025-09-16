@@ -1,9 +1,10 @@
-'use client'
+ 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Calendar, momentLocalizer, View, Views, DateLocalizer, Formats } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import { defaultPreferences, PREFS_STORAGE_KEY, type Preferences } from '@/lib/preferences/types'
 
 const localizer = momentLocalizer(moment)
 
@@ -41,6 +42,7 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<View>(Views.WEEK)
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [userPrefs, setUserPrefs] = useState<Preferences>(defaultPreferences)
 
   
   const abortRef = useRef<AbortController | null>(null)
@@ -51,8 +53,17 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
   }, [refreshTrigger])
 
   useEffect(() => {
-    fetchAllEvents()
-  }, [refreshTrigger, currentView, currentDate])
+    try {
+      const raw = localStorage.getItem(PREFS_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        setUserPrefs({ ...defaultPreferences, ...parsed })
+      } else {
+        setUserPrefs(defaultPreferences)
+      }
+    } catch {}
+  }, [refreshTrigger])
+  
 
   useEffect(() => {
     return () => {
@@ -99,6 +110,10 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
       setLoading(false)
     }
   }, [currentView, currentDate])
+
+  useEffect(() => {
+    fetchAllEvents()
+  }, [refreshTrigger, currentView, currentDate, fetchAllEvents])
 
   const fetchGoogleEvents = async (startDate: Date, endDate: Date, signal?: AbortSignal): Promise<GoogleCalendarEvent[]> => {
     try {
@@ -193,9 +208,9 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
             timeGutterFormat: (date: Date, culture?: string, loc?: DateLocalizer) =>
               (loc ? loc.format(date, 'h a', culture) : moment(date).format('h a')),
           }
-          const minTime = moment().startOf('day').add(8, 'hours').toDate()
-          const maxTime = moment().startOf('day').add(20, 'hours').toDate()
-          const scrollToTime = moment().startOf('day').add(8, 'hours').toDate()
+          const minTime = moment().startOf('day').add(userPrefs.workStartHour, 'hours').toDate()
+          const maxTime = moment().startOf('day').add(userPrefs.workEndHour, 'hours').toDate()
+          const scrollToTime = minTime
           return (
             <Calendar
               localizer={localizer}

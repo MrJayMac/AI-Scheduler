@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions'
 
 export type ParsedTask = {
   summary: string
@@ -34,16 +35,16 @@ export async function parseTaskWithAI(input: {
     strict: true,
   } as const
 
-  const prompt = [
+  const prompt: ChatCompletionMessageParam[] = [
     { role: 'system', content: 'Extract a calendar event from the user text. Use the provided now and timeZone for interpreting relative dates. Output strictly the JSON matching the schema.' },
     { role: 'user', content: JSON.stringify({ text: input.text, nowISO, timeZone: input.timeZone || 'local' }) },
-  ] as const
+  ]
 
   try {
     const resp = await client.chat.completions.create({
       model: MODEL,
-      messages: prompt as any,
-      response_format: { type: 'json_schema', json_schema: schema as any },
+      messages: prompt,
+      response_format: { type: 'json_schema', json_schema: schema },
       temperature: 0.2,
     })
 
