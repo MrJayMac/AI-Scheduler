@@ -92,31 +92,21 @@ export default function GoogleCalendarConnect() {
   return (
     <div className="p-0">
       <h3 className="m-0 text-base font-semibold mb-2">Google Calendar</h3>
-      
       {isConnected ? (
-        <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/20 text-emerald-300 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="pill pill-success">
             <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.707a1 1 0 00-1.414-1.414L9 10.172 7.707 8.879a1 1 0 10-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
             <span>Connected</span>
           </div>
-          <button
-            onClick={handleDisconnect}
-            className="inline-flex items-center px-3 py-2 rounded-lg text-sm bg-rose-500/80 hover:bg-rose-500 text-white transition shadow ring-1 ring-white/10"
-          >
-            Disconnect Calendar
-          </button>
+          <button onClick={handleDisconnect} className="btn btn-neutral">Disconnect</button>
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-slate-400">Connect your Google Calendar to view your events.</p>
-          <button
-            onClick={handleConnect}
-            disabled={connecting}
-            className={`${connecting ? 'bg-slate-600 text-slate-300 cursor-not-allowed' : 'bg-[#4285f4]/80 hover:bg-[#4285f4] text-white'} inline-flex items-center px-3 py-2 rounded-lg text-sm transition shadow`}
-          >
-            {connecting ? 'Connecting...' : 'Connect Google Calendar'}
+          <button onClick={handleConnect} disabled={connecting} className="btn btn-primary">
+            {connecting ? 'Connecting…' : 'Connect Google Calendar'}
           </button>
         </div>
       )}

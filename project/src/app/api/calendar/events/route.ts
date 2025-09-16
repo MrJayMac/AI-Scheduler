@@ -78,15 +78,12 @@ export async function POST(request: NextRequest) {
 
     if (typeof startDateTime === 'string' && startDateTime.length > 0) {
       startStr = startDateTime
-      // If client provided naive local time (no offset), honor provided timeZone
       includeTimeZone = !(/[zZ]|[+\-]\d{2}:?\d{2}$/.test(startStr))
     } else {
-      // Fallback: use current time in ISO
       startStr = new Date().toISOString()
       includeTimeZone = false
     }
 
-    // Compute end time by adding duration minutes
     const startForCalc = new Date(startStr)
     const endISO = new Date(startForCalc.getTime() + dur * 60000).toISOString()
 

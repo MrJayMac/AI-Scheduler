@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Calendar, momentLocalizer, View, Views, DateLocalizer, Formats } from 'react-big-calendar'
 import moment from 'moment'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
@@ -33,31 +33,34 @@ interface GoogleCalendarEvent {
 
 interface CalendarViewProps {
   refreshTrigger?: number
+  onChange?: () => void
 }
 
-export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
+export default function CalendarView({ refreshTrigger, onChange }: CalendarViewProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<View>(Views.WEEK)
   const [currentDate, setCurrentDate] = useState(new Date())
 
-  // Simplified header: using built-in toolbar, no custom range label
-
+  
   const abortRef = useRef<AbortController | null>(null)
   const cacheRef = useRef<Map<string, { events: CalendarEvent[]; ts: number }>>(new Map())
+
+  useEffect(() => {
+    cacheRef.current.clear()
+  }, [refreshTrigger])
 
   useEffect(() => {
     fetchAllEvents()
   }, [refreshTrigger, currentView, currentDate])
 
-  // Abort any pending request on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort()
     }
   }, [])
 
-  const fetchAllEvents = async () => {
+  const fetchAllEvents = useCallback(async () => {
     try {
       let rangeStart: Date
       let rangeEnd: Date
@@ -68,7 +71,6 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
         rangeStart = moment(currentDate).startOf('day').toDate()
         rangeEnd = moment(currentDate).endOf('day').toDate()
       } else {
-        // week
         rangeStart = moment(currentDate).startOf('week').toDate()
         rangeEnd = moment(currentDate).endOf('week').toDate()
       }
@@ -80,10 +82,8 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
         return
       }
 
-      // show loading only when actually fetching
       setLoading(true)
 
-      // cancel any in-flight request
       if (abortRef.current) abortRef.current.abort()
       const controller = new AbortController()
       abortRef.current = controller
@@ -98,7 +98,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentView, currentDate])
 
   const fetchGoogleEvents = async (startDate: Date, endDate: Date, signal?: AbortSignal): Promise<GoogleCalendarEvent[]> => {
     try {
@@ -132,7 +132,19 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
       }))
   }
 
-  // Using default event styling from react-big-calendar
+  const eventPropGetter = (_event: CalendarEvent) => {
+    void _event
+    return {
+      style: {
+        backgroundColor: 'rgba(17,24,39,0.9)',
+        border: '1px solid rgba(148,163,184,.25)',
+        borderLeft: '3px solid #22d3ee',
+        color: '#e5e7eb',
+        borderRadius: 8,
+        padding: 2,
+      }
+    }
+  }
 
   const handleViewChange = (view: View) => {
     setCurrentView(view)
@@ -157,10 +169,10 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
           console.error('Delete failed:', data)
           return
         }
-        // Optimistically remove and invalidate cache, then refetch
         setEvents(prev => prev.filter(e => e.id !== event.id))
         cacheRef.current.clear()
         void fetchAllEvents()
+        onChange?.()
       } catch (e) {
         console.error('Error deleting event:', e)
       }
@@ -197,6 +209,7 @@ export default function CalendarView({ refreshTrigger }: CalendarViewProps) {
               date={currentDate}
               onNavigate={handleNavigate}
               onSelectEvent={handleSelectEvent}
+              eventPropGetter={eventPropGetter}
               popup
               showMultiDayTimes
               min={minTime}

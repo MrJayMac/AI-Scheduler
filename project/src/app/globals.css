@@ -1,10 +1,20 @@
 @config "../../tailwind.config.js";
 @import "tailwindcss";
 
-/* Global reset and base styles */
 * , *::before, *::after { box-sizing: border-box; }
 
-/* React Big Calendar - Dark Theme Overrides */
+:root {
+  --bg: #0b0f17;
+  --panel: rgba(17,24,39,0.55);
+  --panel-border: rgba(100,116,139,.30);
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --brand: #8b5cf6;
+  --brand-strong: #7c3aed;
+  --success: #10b981;
+  --danger: #ef4444;
+}
+
 .rbc-theme-dark .rbc-calendar { background: transparent; color: #e5e7eb; }
 .rbc-theme-dark .rbc-time-view,
 .rbc-theme-dark .rbc-month-view,
@@ -49,7 +59,7 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0b0f17; /* fallback background to avoid white flash/edges */
+  background: #0b0f17;
 }
 
 body {
@@ -58,8 +68,35 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tailwind component styles for login form without editing AuthForm */
 @layer components {
+  .card {
+    @apply rounded-xl border p-4 md:p-5; 
+    background: var(--panel);
+    border-color: var(--panel-border);
+    backdrop-filter: blur(10px);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition shadow-sm disabled:opacity-60 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply text-white; background: var(--brand); }
+  .btn-primary:hover { background: var(--brand-strong); }
+  .btn-neutral { @apply text-slate-200 border border-slate-500/40; background: transparent; }
+  .btn-neutral:hover { @apply border-slate-400/60 bg-white/5; }
+  .btn-danger { @apply text-white; background: var(--danger); }
+  .btn-danger:hover { @apply brightness-110; }
+
+  .input {
+    @apply w-full rounded-md border border-slate-500/40 bg-white/5 text-slate-200 placeholder-slate-400 px-3 py-2 text-sm outline-none focus:border-violet-400/60 focus:ring-2 focus:ring-violet-500/20;
+  }
+
+  .alert { @apply rounded-md border px-3 py-2 text-xs; }
+  .alert-success { @apply border-emerald-400/30 bg-emerald-500/10 text-emerald-200; }
+  .alert-error { @apply border-red-400/30 bg-red-500/10 text-red-200; }
+
+  .pill { @apply inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs border; }
+  .pill-success { @apply border-emerald-400/20 bg-emerald-500/15 text-emerald-300; }
+
   .login-card input {
     @apply w-full max-w-full bg-white/5 border border-slate-400/25 text-slate-200 px-4 py-3 rounded-lg outline-none transition duration-200 ease-in-out my-2 placeholder:text-slate-500 focus:border-violet-400/50 focus:ring-4 focus:ring-violet-500/20 focus:bg-white/10;
   }
