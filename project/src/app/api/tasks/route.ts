@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createCalendarEvent } from '@/lib/google/calendar-server'
 import { parseTaskWithAI } from '@/lib/ai/parse'
-import { suggestNextSlot } from '@/lib/scheduler/suggest'
+import { suggestNextSlot, suggestBestSlot } from '@/lib/scheduler/suggest'
 import { defaultPreferences, type Preferences } from '@/lib/preferences/types'
 
 export async function POST(request: NextRequest) {
@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
       includeTimeZone = !(/[zZ]|[+\-]\d{2}:?\d{2}$/.test(startStr))
     } else if (incomingPrefs.suggestTime) {
       summary = (text as string).trim()
-      const suggestedISO = await suggestNextSlot({ now, durationMin: dur, prefs: incomingPrefs })
+      // Use weighted scheduler for better placement; fallback to first-fit if none
+      let suggestedISO = await suggestBestSlot({ now, durationMin: dur, prefs: incomingPrefs })
+      if (!suggestedISO) {
+        suggestedISO = await suggestNextSlot({ now, durationMin: dur, prefs: incomingPrefs })
+      }
       if (suggestedISO) {
         startStr = suggestedISO
         includeTimeZone = !(/[zZ]|[+\-]\d{2}:?\d{2}$/.test(startStr))
@@ -62,8 +66,11 @@ export async function POST(request: NextRequest) {
     const startForCalc = new Date(startStr)
     const endISO = new Date(startForCalc.getTime() + dur * 60000).toISOString()
 
+    const meta = { parsed: !!ai, suggested: !ai, durationMin: dur }
+    const description = `AI-SCHEDULER ${JSON.stringify(meta)}`
     const event = await createCalendarEvent({
       summary,
+      description,
       start: includeTimeZone && typeof timeZone === 'string' && timeZone
         ? { dateTime: startStr, timeZone }
         : { dateTime: startStr },

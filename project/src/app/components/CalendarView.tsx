@@ -13,6 +13,7 @@ interface CalendarEvent {
   title: string
   start: Date
   end: Date
+  desc?: string
   resource: {
     type: 'google'
     googleEventId?: string
@@ -22,6 +23,7 @@ interface CalendarEvent {
 interface GoogleCalendarEvent {
   id: string
   summary: string
+  description?: string
   start: {
     dateTime?: string
     date?: string
@@ -140,6 +142,7 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
         title: event.summary || 'Untitled Event',
         start: new Date(event.start.dateTime || event.start.date || ''),
         end: new Date(event.end.dateTime || event.end.date || ''),
+        desc: event.description,
         resource: {
           type: 'google' as const,
           googleEventId: event.id
@@ -147,13 +150,13 @@ export default function CalendarView({ refreshTrigger, onChange }: CalendarViewP
       }))
   }
 
-  const eventPropGetter = (_event: CalendarEvent) => {
-    void _event
+  const eventPropGetter = (event: CalendarEvent) => {
+    const isAI = !!event.desc && event.desc.startsWith('AI-SCHEDULER ')
     return {
       style: {
-        backgroundColor: 'rgba(17,24,39,0.9)',
+        backgroundColor: isAI ? 'rgba(2,132,199,0.25)' : 'rgba(17,24,39,0.9)',
         border: '1px solid rgba(148,163,184,.25)',
-        borderLeft: '3px solid #22d3ee',
+        borderLeft: `3px solid ${isAI ? '#22c55e' : '#22d3ee'}`,
         color: '#e5e7eb',
         borderRadius: 8,
         padding: 2,
