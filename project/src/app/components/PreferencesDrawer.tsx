@@ -24,6 +24,9 @@ export default function PreferencesDrawer({ open, onClose }: PreferencesDrawerPr
   const save = () => {
     try {
       localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('prefs-updated', { detail: prefs }))
+      }
       onClose()
     } catch {}
   }
